@@ -1,5 +1,6 @@
 vehicle1 = {
     "_id":1,
+    "OwnerID":"owner1",
     "Make": "Audi",
     "Model": "80",
     "Engine": {
@@ -14,6 +15,7 @@ vehicle1 = {
 
 vehicle2 = {
     "_id":2,
+    "OwnerID":"owner2",
     "Make": "BMW",
     "Model": "E46",
     "Engine": {
@@ -28,6 +30,7 @@ vehicle2 = {
 
 vehicle3 = {
     "_id":3,
+    "OwnerID":"owner1",
     "Make": "VW",
     "Model": "Passat",
     "Engine": {
@@ -42,6 +45,7 @@ vehicle3 = {
 
 vehicle4 = {
     "_id":4,
+    "OwnerID":"owner3",
     "Make": "VW",
     "Model": "Sharan",
     "Engine": {
@@ -56,6 +60,7 @@ vehicle4 = {
 
 vehicle5 = {
     "_id":5,
+    "OwnerID":"owner2",
     "Make": "BMW",
     "Model": "E36",
     "Engine": {

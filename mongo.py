@@ -38,11 +38,57 @@ def aggregation():
         for car in owner['Vehicles']:
             print("{make} {model} {engineDis}cc {kw}".format(make=car['Make'], model=car['Model'], engineDis=car['Engine']['DisplacementCC'], kw=car['Engine']['Fuel']))
 
+def mapreduce(ownerID):
+    mapper1 = """
+        function(){
+            for(var i = 0; i < this.Vehicles.length; i++)
+                emit(this.Vehicles[i], {VehicleID: this._id});
+        }
+    """
+    mapper2 = """
+        function(){
+            emit(this._id, {Name: this.Name})
+        }
+    """
+
+    reduceLookUp1 = """
+        function(key, values){
+            var results = {};
+            var vehicles = [];
+            values.forEach(function(value){
+                var vehicle = {};
+                if (value.VehicleID !== undefined) vehicle["VehicleID"] = value.VehicleID;
+                if (Object.keys(vehicle).length > 0) vehicles.push(vehicle);
+                if (value.Name !== undefined) results["Name"] = value.Name;
+                if (value.vehicles !== undefined) results["vehicles"] = value.vehicles;
+            });
+            if (Object.keys(vehicles).length > 0) results["vehicles"] = vehicles;
+            return results;
+        }
+    """
+
+    mapper = """
+        function() {{
+        if (this.OwnerID == '""" + ownerID + """')
+            emit(this.Make, this.Model, this.Engine.DisplacementCC, this.Engine.Fuel);
+        }};
+    """
+    reduceLookUp = """
+        function(Make, Model, DisplacementCC, Fuel){
+            return Make, Model, DisplacementCC, Fuel;
+    };
+    """
+    db.command('mapReduce', 'Owners', map=mapper1, reduce=reduceLookUp1, out={'reduce': 'joined'})
+    db.command('mapReduce', 'Vehicles', map=mapper2, reduce=reduceLookUp1, out={'reduce': 'joined'})
+    print(db["joined"].find({}))
 # Main
 def main():
     dataInsert()
-    getEmbedded()
-    aggregation()
+    #print("Embedded output:")
+    #getEmbedded()
+    #print("\nAggregation output:")
+    #aggregation()
+    mapreduce("owner1")
 
 
 if __name__ == "__main__":
