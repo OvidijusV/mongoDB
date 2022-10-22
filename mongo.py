@@ -1,5 +1,6 @@
 import pymongo
 import owners, vehicles
+
 mongoClient = pymongo.MongoClient("mongodb://localhost:27017/")
 
 db = mongoClient["VehicleRegistration"]
@@ -9,6 +10,8 @@ vehiclesCol = db["Vehicles"]
 
 ownersCol.drop()
 vehiclesCol.drop()
+db["vehicleMap"].drop()
+db["ownerMap"].drop()
 
 # Insert data
 def dataInsert():
@@ -38,57 +41,56 @@ def aggregation():
         for car in owner['Vehicles']:
             print("{make} {model} {engineDis}cc {kw}".format(make=car['Make'], model=car['Model'], engineDis=car['Engine']['DisplacementCC'], kw=car['Engine']['Fuel']))
 
-def mapreduce(ownerID):
-    mapper1 = """
+def mapreduce():
+
+    mapperOwner = """
         function(){
-            for(var i = 0; i < this.Vehicles.length; i++)
-                emit(this.Vehicles[i], {VehicleID: this._id});
-        }
-    """
-    mapper2 = """
-        function(){
-            emit(this._id, {Name: this.Name})
+            emit(this._id, {ownerID: this._id, Name: this.Name, Surname: this.Surname, Vehicles: this.Vehicles})
         }
     """
 
-    reduceLookUp1 = """
+    reducerOwner = """
         function(key, values){
-            var results = {};
-            var vehicles = [];
-            values.forEach(function(value){
-                var vehicle = {};
-                if (value.VehicleID !== undefined) vehicle["VehicleID"] = value.VehicleID;
-                if (Object.keys(vehicle).length > 0) vehicles.push(vehicle);
-                if (value.Name !== undefined) results["Name"] = value.Name;
-                if (value.vehicles !== undefined) results["vehicles"] = value.vehicles;
-            });
-            if (Object.keys(vehicles).length > 0) results["vehicles"] = vehicles;
+            let results = {}
+            results.owner = values[0];
             return results;
         }
     """
 
-    mapper = """
-        function() {{
-        if (this.OwnerID == '""" + ownerID + """')
-            emit(this.Make, this.Model, this.Engine.DisplacementCC, this.Engine.Fuel);
-        }};
+    mapperVehicle = """
+        function(){
+            emit(this._id, {vehicleID: this._id, Make: this.Make, Model: this.Model, engineCC: this.Engine.DisplacementCC, Fuel: this.Engine.Fuel})
+        }
     """
-    reduceLookUp = """
-        function(Make, Model, DisplacementCC, Fuel){
-            return Make, Model, DisplacementCC, Fuel;
-    };
+
+    reducerVehicle = """
+        function(key, values){
+            let results = {}
+            results.vehicle = values;
+            return results;
+        }
     """
-    db.command('mapReduce', 'Owners', map=mapper1, reduce=reduceLookUp1, out={'reduce': 'joined'})
-    db.command('mapReduce', 'Vehicles', map=mapper2, reduce=reduceLookUp1, out={'reduce': 'joined'})
-    print(db["joined"].find({}))
+
+    db.command('mapReduce', 'Owners', map=mapperOwner, reduce=reducerOwner, out={'reduce': 'ownerMap'})
+    db.command('mapReduce', 'Vehicles', map=mapperVehicle, reduce=reducerVehicle, out={'reduce': 'vehicleMap'})
+
+    for i in db["ownerMap"].find({}, {"value"}):
+        print(f"Owner: {i['value']['owner']['Name']} {i['value']['owner']['Surname']}\nHas vehicles:")
+        for carID in i['value']['owner']['Vehicles']:
+            car = db["vehicleMap"].find_one({"_id": carID['VehicleID']})
+            print(f"{car['value']['vehicle'][0]['Make']} {car['value']['vehicle'][0]['Model']} {int(car['value']['vehicle'][0]['engineCC'])}cc {car['value']['vehicle'][0]['Fuel']}")
+            #print(carID['VehicleID'])
+
+ 
 # Main
 def main():
     dataInsert()
-    #print("Embedded output:")
-    #getEmbedded()
-    #print("\nAggregation output:")
-    #aggregation()
-    mapreduce("owner1")
+    print("Embedded output:")
+    getEmbedded()
+    print("\nAggregation output:")
+    aggregation()
+    print("\nMap-reduce output:")
+    mapreduce()
 
 
 if __name__ == "__main__":
